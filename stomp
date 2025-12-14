@@ -1,0 +1,656 @@
+When using STOMP inside Websockets within a Java Spring Boot Application service how is the notification which is going out to a UI constructed, I annot understand how the browser address hosting the UI is specified,
+
+It is perfectly normal to be confused by this because WebSockets do not work like the Web. In a normal web request, the server needs a URL/Address to "find" the browser. In a WebSocket, the server never looks for the browser's address; it looks for an open Pipe.
+
+Here is how the "address" is actually resolved and how the notification is constructed.
+
+1. The "Pipe" replaces the "Address"
+When your browser first connects to the Spring Boot server, it performs an HTTP Handshake. Once that handshake is successful, the HTTP connection is "upgraded" to a persistent WebSocket.
+
+The Connection: Think of this as a literal physical pipe that stays open.
+
+The Session ID: Spring assigns a unique simpSessionId to that pipe.
+
+The Lookup: When you want to send a notification, Spring doesn't ask "What is the browser's IP/URL?", it asks "Which open Pipe (Session ID) belongs to this user?"
+
+2. How the Notification is Constructed
+The notification isn't just a raw string; it is wrapped in a STOMP Frame. STOMP (Simple Text Oriented Messaging Protocol) is like the "envelope" for your data.
+
+When you call messagingTemplate.convertAndSendToUser("john", "/queue/updates", myObject), Spring performs these steps:
+
+Serialization: It takes your Java myObject and turns it into JSON (usually via Jackson).
+
+Addressing: It looks at the destination (/queue/updates).
+
+User Mapping: Because you used convertAndSendToUser, Spring's UserDestinationMessageHandler looks up which Session IDs are currently logged in as "john".
+
+Envelope Creation: It creates a STOMP MESSAGE frame that looks like this:
+
+Plaintext
+MESSAGE
+destination:/user/john/queue/updates
+content-type:application/json
+subscription:sub-0
+message-id:12345
+
+{"status": "Success", "message": "Your webhook was processed!"}
+3. How the Browser "Receives" It
+The browser address is never specified because the browser is already holding the other end of the pipe.
+
+The browser (using a library like stomp.js) says: "I am subscribing to /user/queue/updates."
+
+Spring notes: "Session XYZ wants anything sent to /user/john/queue/updates."
+
+When the Webhook triggers the SimpMessagingTemplate, Spring pushes that MESSAGE frame down Session XYZ.
+
+The browser's JavaScript "hears" data coming through the pipe, sees it's for the subscription it made, and triggers your callback function.
+
+4. Summary of Components
+Logic	Traditional Web (HTTP)	STOMP WebSockets
+Identification	IP Address / URL	Session ID / Principal Name
+Delivery	Server waits for Request	Server pushes through open Socket
+Pathing	REST Endpoints (/api/data)	STOMP Destinations (/topic/logs)
+Practical Rule of Thumb
+You don't need to specify the browser's address. You only need to ensure:
+
+The User is authenticated (so Spring knows which Session belongs to "John").
+
+The Destination matches (The browser subscribes to exactly what the server sends to).
+
+Would you like to see the JavaScript code that "holds the other end of the pipe" to catch these notifications?
+
+how does this change if I am just using convertAndSend (not to user)
+
+When you switch from convertAndSendToUser to the standard convertAndSend, you are moving from Private Messaging to Broadcasting.
+
+The fundamental "pipe" mechanism remains the same, but the way Spring handles the "addressing" of that pipe changes significantly.
+
+1. The "Public Radio" Analogy
+Think of the difference like this:
+
+convertAndSendToUser is like a Phone Call. You are dialing a specific person, and only their device rings.
+
+convertAndSend is like a Radio Broadcast. You are transmitting on a specific frequency (destination). Anyone who has tuned their radio to that frequency will hear the message, regardless of who they are.
+
+2. How the Messaging Logic Changes
+When you use messagingTemplate.convertAndSend("/topic/all-updates", payload), Spring skips the "User Lookup" step entirely.
+
+No Principal Required: Spring doesn't check who the user is or what their Session ID is.
+
+Destination Matching: Spring looks at its internal registry to see: "Which active WebSocket sessions are currently subscribed to /topic/all-updates?"
+
+Multicasting: If 1,000 browsers are connected and all 1,000 are subscribed to that topic, Spring will iterate through all 1,000 "pipes" and push the same STOMP frame down each one.
+
+3. Comparison of Implementation
+Feature	convertAndSendToUser	convertAndSend
+Typical Destination	/queue/notifications	/topic/public-announcements
+Security	Implicitly private to that user.	Public to anyone subscribed.
+Client Subscription	/user/queue/notifications	/topic/public-announcements
+Spring Logic	Resolves User → Session ID.	Resolves Destination → All Subscribers.
+4. When to Use Which?
+In your Webhook-to-WebSocket architecture, the choice depends on the nature of the event:
+
+Use convertAndSendToUser for:
+
+Payment confirmations ("Your payment was successful").
+
+Personalized alerts ("You have a new message").
+
+Private background task completion.
+
+Use convertAndSend for:
+
+System-wide maintenance alerts.
+
+Live sports scores or stock tickers where everyone sees the same data.
+
+Chat rooms where multiple people share a single "frequency."
+
+5. A Note on the Destination Prefix
+Usually, in your WebSocketConfig, you define two different prefixes for these behaviors:
+
+Java
+@Override
+public void configureMessageBroker(MessageBrokerRegistry config) {
+    // /topic is typically for broadcasts (convertAndSend)
+    // /queue is typically for private messages (convertAndSendToUser)
+    config.enableSimpleBroker("/topic", "/queue");
+}
+If you send to /topic/news, any browser doing stomp.subscribe('/topic/news', ...) will get it.
+
+Would you like to see how to configure the MessageBrokerRegistry to ensure these paths are handled correctly by the server?
+
+yes please
+
+To get the Webhook-to-WebSocket flow working, you need a configuration class that acts as the "traffic controller." This class defines how the browser connects and where the messages are allowed to go.
+
+1. The WebSocket Configuration Class
+Create a class annotated with @Configuration and @EnableWebSocketMessageBroker.
+
+Java
+import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
+import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
+import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+
+@Configuration
+@EnableWebSocketMessageBroker
+public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry config) {
+        // 1. Enable a memory-based message broker
+        // /topic = Broadcasts (1 to many)
+        // /queue = Private messages (1 to 1)
+        config.enableSimpleBroker("/topic", "/queue");
+
+        // 2. Prefix for messages bound for methods annotated with @MessageMapping
+        config.setApplicationDestinationPrefixes("/app");
+
+        // 3. Prefix for specialized user-specific messaging
+        config.setUserDestinationPrefix("/user");
+    }
+
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // This is the URL where the browser initiates the initial handshake
+        registry.addEndpoint("/ws-handshake")
+                .setAllowedOrigins("*") // In production, replace with your UI domain
+                .withSockJS(); // Enables fallback options if WebSockets aren't supported
+    }
+}
+2. Breakdown of the Key Parts
+The Message Broker (enableSimpleBroker)
+This defines the "prefixes" for your destinations.
+
+If you use convertAndSend("/topic/news", ...) and the broker isn't enabled for /topic, the message will go nowhere.
+
+SimpleBroker lives in the server's RAM. For small apps, this is fine. For massive scale, you would replace this with RabbitMQ or ActiveMQ.
+
+The Handshake Endpoint (addEndpoint)
+This is the only actual "URL" the browser needs to know.
+
+The browser connects to http://localhost:8080/ws-handshake.
+
+Once connected, it stops using HTTP and switches to the persistent WebSocket protocol.
+
+The User Destination Prefix (setUserDestinationPrefix)
+This is the "magic" that makes convertAndSendToUser work. When you send a message to a user named "Alice" at /queue/alerts, Spring internally transforms that destination into something like /user/Alice/queue/alerts so it doesn't collide with a user named "Bob."
+
+3. How the Paths Map Together
+Action	Server-Side Code	Client-Side (JS) Subscription
+Broadcast	convertAndSend("/topic/all", ...)	stomp.subscribe('/topic/all', ...)
+Private	convertAndSendToUser("id", "/queue/me", ...)	stomp.subscribe('/user/queue/me', ...)
+Client Send	@MessageMapping("/hello")	stomp.send('/app/hello', ...)
+4. Handling Security (CORS)
+Note the .setAllowedOrigins("*"). In a real Spring Boot application, WebSockets are protected by the same Same-Origin Policy as regular web requests. If your UI is running on localhost:3000 and your server is on localhost:8080, you must specify the origin, or the handshake will fail with a 403 Forbidden error.
+
+Would you like me to provide the basic JavaScript code using stompjs to test this connection from a browser?
+
+Barwick in Elmet, Leeds, UK
+yes please
+
+To test your Spring Boot WebSocket configuration, you can use the STOMP.js and SockJS libraries. These are the industry standards for handling the handshake and maintaining the "pipe" we discussed.
+
+1. The Client-Side JavaScript
+You can run this code in a simple index.html file or within a React/Angular component.
+
+JavaScript
+// 1. Define the connection URL (the endpoint from your WebSocketConfig)
+const socket = new SockJS('http://localhost:8080/ws-handshake');
+const stompClient = Stomp.over(socket);
+
+stompClient.connect({}, function (frame) {
+    console.log('Connected: ' + frame);
+
+    // 2. Subscribe to a BROADCAST topic (convertAndSend)
+    stompClient.subscribe('/topic/all', function (message) {
+        console.log('Broadcast received: ' + message.body);
+    });
+
+    // 3. Subscribe to a PRIVATE queue (convertAndSendToUser)
+    // Note: Spring automatically handles the /user prefix mapping
+    stompClient.subscribe('/user/queue/me', function (message) {
+        console.log('Private message received: ' + message.body);
+    });
+});
+2. How the Handshake Actually Happens
+It is helpful to see the transition from standard HTTP to a persistent WebSocket. This happens in the first few milliseconds of the connection.
+
+Browser sends HTTP GET: It includes a header Upgrade: websocket.
+
+Server responds with 101: This status code confirms the server is "switching protocols" from HTTP to WebSockets.
+
+STOMP over WS: Once the pipe is open, the STOMP protocol takes over to manage the SUBSCRIBE and SEND frames.
+
+3. Quick Checklist for Success
+If your connection fails, check these three common "gotchas":
+
+Dependency: Ensure you have the spring-boot-starter-websocket in your pom.xml.
+
+CORS: If your browser console says Origin not allowed, ensure you have .setAllowedOrigins("*") (or your specific domain) in your WebSocketConfig.
+
+Authentication: For convertAndSendToUser to work, the user must be "logged in" so that Spring's Principal object is populated. If you aren't using Spring Security yet, the "User" mapping will be null, and private messages won't find their destination.
+
+4. Testing without a UI
+If you don't want to write HTML/JS yet, you can use a tool like Postman (which now supports WebSockets) or a Chrome extension like "Smart WebSocket Client".
+
+Set the URL to ws://localhost:8080/ws-handshake/websocket.
+
+Send a STOMP connect frame:
+
+Plaintext
+CONNECT
+accept-version:1.1,1.0
+heart-beat:10000,10000
+
+^@
+Would you like me to show you how to set up a simple Spring Security configuration to ensure the Principal is populated for those private convertAndSendToUser messages?
+
+Barwick in Elmet, Leeds, UK
+yes please
+
+To use convertAndSendToUser, Spring Boot needs to know "who" a connection belongs to. This is handled by a Principal object.
+
+In a production app, Spring Security automatically populates this Principal after a user logs in via a web form or JWT. However, if you are prototyping and want to test private messaging without a full security system, you can "fake" the identity during the initial handshake.
+
+1. Create a "Fake" Principal
+First, we need a simple class to hold the user's name.
+
+Java
+import java.security.Principal;
+
+public class StompPrincipal implements Principal {
+    private String name;
+
+    public StompPrincipal(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public String getName() {
+        return name;
+    }
+}
+2. Create a Custom Handshake Handler
+This is where the magic happens. We intercept the initial connection and assign a random ID (or one passed in a query param) to that specific WebSocket "pipe."
+
+Java
+import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.web.socket.WebSocketHandler;
+import org.springframework.web.socket.server.support.DefaultHandshakeHandler;
+import java.security.Principal;
+import java.util.Map;
+import java.util.UUID;
+
+public class CustomHandshakeHandler extends DefaultHandshakeHandler {
+    @Override
+    protected Principal determineUser(ServerHttpRequest request, 
+                                      WebSocketHandler wsHandler, 
+                                      Map<String, Object> attributes) {
+        // Generate a random ID for the user
+        // In a real app, you'd extract this from a cookie or token
+        String randomId = UUID.randomUUID().toString().substring(0, 5);
+        System.out.println("New User Connected: " + randomId);
+        return new StompPrincipal(randomId);
+    }
+}
+3. Update your WebSocketConfig
+Tell Spring to use your custom handler during the handshake.
+
+Java
+@Override
+public void registerStompEndpoints(StompEndpointRegistry registry) {
+    registry.addEndpoint("/ws-handshake")
+            .setAllowedOrigins("*")
+            .setHandshakeHandler(new CustomHandshakeHandler()) // Set it here!
+            .withSockJS();
+}
+4. How it works in the "Relay Race"
+Now, when your Webhook receives data, it can target that specific ID.
+
+5. Final Code: Sending the Private Message
+In your controller, you can now use the Principal name you generated:
+
+Java
+@PostMapping("/webhook-receiver")
+public void handle(@RequestBody MyData data) {
+    // If you know the user's ID is "abcde"
+    messagingTemplate.convertAndSendToUser(
+        "abcde", 
+        "/queue/me", 
+        "Private data for you!"
+    );
+}
+Important Technical Summary
+Handshake Phase: The only time the Principal is established. It "sticks" to that WebSocket session until it closes.
+
+The /user Prefix: On the client side, you always subscribe to /user/queue/me. Spring is smart enough to know that "Alice" subscribing to /user/queue/me actually means she's subscribing to a unique internal path like /queue/me-userAlice.
+
+Reliability: This custom handler is perfect for local testing. In production, you would use @EnableWebSecurity and Spring would automatically handle this determineUser logic based on your OAuth2 or Session cookies.
+
+Would you like to see how to pass a specific User ID from the browser (via query params) so the server knows exactly who is connecting?
+
+Barwick in Elmet, Leeds, UK
+yes please
+
+To pass a specific User ID from the browser during the handshake, we leverage Handshake Interceptors. This allows the server to read URL parameters (like ?userId=john_doe) and attach them to the WebSocket session.
+
+1. The Handshake Interceptor
+We create an interceptor to "grab" the ID from the URL and store it in the session attributes.
+
+Java
+import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.http.server.ServerHttpResponse;
+import org.springframework.http.server.ServletServerHttpRequest;
+import org.springframework.web.socket.WebSocketHandler;
+import org.springframework.web.socket.server.HandshakeInterceptor;
+import java.util.Map;
+
+public class UserHandshakeInterceptor implements HandshakeInterceptor {
+
+    @Override
+    public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, 
+                                   WebSocketHandler wsHandler, Map<String, Object> attributes) {
+        if (request instanceof ServletServerHttpRequest servletRequest) {
+            // Extract "userId" from query parameter: /ws-handshake?userId=123
+            String userId = servletRequest.getServletRequest().getParameter("userId");
+            if (userId != null) {
+                attributes.put("userId", userId);
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response, 
+                               WebSocketHandler wsHandler, Exception exception) {}
+}
+2. The Updated Handshake Handler
+Now, we update our determineUser logic to look for that "userId" attribute we just saved.
+
+Java
+public class CustomHandshakeHandler extends DefaultHandshakeHandler {
+    @Override
+    protected Principal determineUser(ServerHttpRequest request, 
+                                      WebSocketHandler wsHandler, 
+                                      Map<String, Object> attributes) {
+        // Retrieve the ID we grabbed in the interceptor
+        String userId = (String) attributes.get("userId");
+        
+        // Fallback to random if not provided
+        if (userId == null) userId = "guest-" + UUID.randomUUID().toString().substring(0, 4);
+        
+        return new StompPrincipal(userId);
+    }
+}
+3. Wire it into WebSocketConfig
+You must register both the Handler and the Interceptor in your configuration.
+
+Java
+@Override
+public void registerStompEndpoints(StompEndpointRegistry registry) {
+    registry.addEndpoint("/ws-handshake")
+            .setAllowedOrigins("*")
+            .setHandshakeHandler(new CustomHandshakeHandler())
+            .addInterceptors(new UserHandshakeInterceptor()) // Add this!
+            .withSockJS();
+}
+4. The Browser-Side Connection
+On the client side, you simply append the query parameter to your connection string.
+
+JavaScript
+// Each user can now identify themselves
+const myUserId = "user_abc_123"; 
+const socket = new SockJS(`http://localhost:8080/ws-handshake?userId=${myUserId}`);
+const stompClient = Stomp.over(socket);
+
+stompClient.connect({}, function (frame) {
+    // Subscription remains the same
+    stompClient.subscribe('/user/queue/me', function (msg) {
+        console.log("Private message for " + myUserId + ": " + msg.body);
+    });
+});
+How the Full Circle Closes
+Connect: Browser hits /ws-handshake?userId=user_abc_123.
+
+Identify: Server assigns Principal("user_abc_123") to that pipe.
+
+Webhook Trigger: Your external service (Stripe/GitHub) sends a Webhook containing "userId": "user_abc_123".
+
+Push: Your Controller calls messagingTemplate.convertAndSendToUser("user_abc_123", "/queue/me", data).
+
+Receive: Spring finds the pipe labeled user_abc_123 and sends the data.
+
+Would you like me to wrap this all up into a single, cohesive "Webhook-to-WebSocket" project structure so you can see how all these files sit together?
+
+Barwick in Elmet, Leeds, UK
+yes
+
+To wrap everything up, here is the architectural blueprint of the entire Webhook-to-WebSocket flow. This structure shows how the components we built (the Interceptor, the Handler, and the Controller) work as a single machine.
+
+1. Project Directory Structure
+Plaintext
+src/main/java/com/example/app/
+├── config/
+│   ├── WebSocketConfig.java        <-- The Traffic Controller
+│   ├── UserHandshakeInterceptor.java <-- The ID Grabber
+│   └── CustomHandshakeHandler.java   <-- The Identity Assigner
+├── controller/
+│   └── WebhookController.java      <-- The Entry Point for External Data
+├── model/
+│   ├── StompPrincipal.java         <-- The Identity Object
+│   └── WebhookPayload.java         <-- The Data Blueprint
+└── service/ (Optional)
+    └── NotificationService.java    <-- Business Logic
+2. The Final "Relay Race" Workflow
+This diagram illustrates exactly how the "User ID" travels from the Browser to the Server, and then back from an External Service to the specific User.
+
+3. Final Code Checklist
+Here is the logic condensed into the three essential movements:
+
+Movement A: The Browser Connects (Identifying)
+The browser tells the server: "I am user-789."
+
+JavaScript
+const socket = new SockJS('http://localhost:8080/ws-handshake?userId=user-789');
+const stompClient = Stomp.over(socket);
+stompClient.connect({}, () => {
+    stompClient.subscribe('/user/queue/me', (msg) => { console.log(msg.body); });
+});
+Movement B: The Webhook Arrives (Triggering)
+An external system (like Stripe) hits your server with data that includes that same ID.
+
+Java
+@PostMapping("/api/webhooks/stripe")
+public void handleStripeWebhook(@RequestBody Map<String, Object> payload) {
+    // 1. Extract the ID that matches our Principal
+    String targetUserId = (String) payload.get("metadata_user_id"); 
+    
+    // 2. Logic to process payment...
+    
+    // 3. Hand the baton to the WebSocket
+    messagingTemplate.convertAndSendToUser(targetUserId, "/queue/me", "Payment Verified!");
+}
+Movement C: The "User Destination" Mapping (Delivering)
+Spring looks at its internal Session Registry. It sees that user-789 is currently associated with WebSocket Session ID: xyz-123. It pushes the message through that specific persistent pipe.
+
+4. Summary of Key Components
+Component	Responsibility
+HandshakeInterceptor	Reads the userId from the URL params before the connection starts.
+HandshakeHandler	Turns that userId into a Principal (the "ID card" for the pipe).
+SimpMessagingTemplate	The tool that allows your REST Controller to "talk" to the WebSocket broker.
+UserDestinationPrefix	The setting (/user) that ensures Alice doesn't see Bob's messages.
+Would you like me to generate a complete pom.xml with all the necessary dependencies to ensure this project builds without errors?
+
+yes
+
+To get your Webhook-to-WebSocket project running, you need the right set of starters. Spring Boot handles most of the heavy lifting, but you need to include the specific modules for Web, WebSockets, and JSON processing.
+
+1. The pom.xml Configuration
+This configuration uses the Spring Boot Parent to manage versions and includes the spring-boot-starter-websocket which brings in the STOMP and SockJS support automatically.
+
+XML
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" 
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.0</version> <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>webhook-websocket-demo</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <optional>true</optional>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+2. Dependency Breakdown
+spring-boot-starter-web: Provides the @RestController capabilities to receive the HTTP POST Webhooks from external services.
+
+spring-boot-starter-websocket: This is the core dependency. It includes:
+
+The WebSocket API.
+
+STOMP support for high-level messaging.
+
+SockJS client compatibility for older browsers.
+
+The SimpMessagingTemplate used to bridge the Webhook to the socket.
+
+3. Visualizing the Full Integration
+Below is the final logical view of how all these parts—the Maven dependencies, the Java logic, and the browser—form the data pipeline.
+
+4. Running the Application
+Start the app: Run your main method.
+
+Connect Client: Open your browser console and run the JavaScript connection code we wrote earlier (ensure you include the ?userId=... param).
+
+Trigger Webhook: Use Postman or curl to send a POST request to your /api/webhooks endpoint.
+
+Observe: You will see the message pop up in your browser console immediately!
+
+Would you like me to create a simple index.html file that includes the necessary CDN links for SockJS and STOMP so you can test this in one click?
+
+yes
+
+Here is a complete, single-file index.html you can use to test your entire setup. It includes the required CDNs for SockJS and STOMP.js, along with a simple UI to track the connection status and incoming messages.
+
+1. The Test Client (index.html)
+HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Webhook-WebSocket Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
+        #messages { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: scroll; background: #f9f9f9; }
+        .status { font-weight: bold; }
+        .connected { color: green; }
+        .disconnected { color: red; }
+    </style>
+</head>
+<body>
+    <h2>WebSocket Real-Time Monitor</h2>
+    <p>Status: <span id="status" class="status disconnected">Disconnected</span></p>
+    <p>My User ID: <b id="displayId">...</b></p>
+    
+    <div id="messages">
+        <em>Waiting for webhook notifications...</em>
+    </div>
+
+    <script>
+        // 1. Generate or define a User ID
+        const userId = "user_" + Math.floor(Math.random() * 1000);
+        document.getElementById('displayId').innerText = userId;
+
+        const messageDiv = document.getElementById('messages');
+        const statusSpan = document.getElementById('status');
+
+        // 2. Connect using the endpoint defined in your WebSocketConfig
+        const socket = new SockJS(`http://localhost:8080/ws-handshake?userId=${userId}`);
+        const stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function (frame) {
+            statusSpan.innerText = "Connected";
+            statusSpan.className = "status connected";
+            console.log('Connected: ' + frame);
+
+            // 3. Subscribe to the private queue
+            stompClient.subscribe('/user/queue/me', function (sdkEvent) {
+                const newNode = document.createElement("p");
+                newNode.innerHTML = `<strong>[NOTIFICATION]:</strong> ${sdkEvent.body}`;
+                messageDiv.appendChild(newNode);
+                messageDiv.scrollTop = messageDiv.scrollHeight; // Auto-scroll
+            });
+        }, function (error) {
+            statusSpan.innerText = "Error: " + error;
+            statusSpan.className = "status disconnected";
+        });
+    </script>
+</body>
+</html>
+2. How to Run the "End-to-End" Test
+Once your Spring Boot application is running with the pom.xml and Java classes we built, follow these steps:
+
+Open the HTML: Open the index.html in your browser. Note the "My User ID" shown on the screen (e.g., user_452).
+
+Trigger the Webhook: Use a tool like Postman or Terminal to simulate the external service (Stripe/GitHub) hitting your server.
+
+The Curl Command: Replace user_452 with the ID visible in your browser:
+
+Bash
+curl -X POST http://localhost:8080/api/webhooks/stripe \
+     -H "Content-Type: application/json" \
+     -d '{"metadata_user_id": "user_452", "status": "PAYMENT_SUCCESS"}'
+3. Understanding the Event Loop
+4. Summary of the Architecture
+Front-End: Listens on a persistent "pipe" identified by a userId.
+
+Spring Boot: Maintains a mapping of userId → Session.
+
+Webhook Controller: Acts as a bridge. It receives a standard HTTP call and "hands off" the data to the WebSocket broker.
+
+STOMP Broker: Delivers the message precisely to the browser tab that matches the ID.
