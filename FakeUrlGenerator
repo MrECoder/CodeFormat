@@ -1,0 +1,42 @@
+import java.util.Random;
+import java.util.UUID;
+
+public class FakeUrlGenerator {
+
+    private static final Random RANDOM = new Random();
+
+    private static final String[] PROTOCOLS = {"http", "https"};
+    private static final String[] DOMAINS = {"example", "testsite", "mockapi", "devportal", "cloud-hub"};
+    private static final String[] TLDs = {".com", ".io", ".org", ".net", ".dev"};
+    private static final String[] PATHS = {"users", "orders", "v1/auth", "metrics", "inventory/items"};
+    private static final String[] PARAMS = {"ref", "source", "session_id", "utm_campaign"};
+
+    public static String generate() {
+        String protocol = PROTOCOLS[RANDOM.nextInt(PROTOCOLS.length)];
+        String domain = DOMAINS[RANDOM.nextInt(DOMAINS.length)];
+        String tld = TLDs[RANDOM.nextInt(TLDs.length)];
+        String path = PATHS[RANDOM.nextInt(PATHS.length)];
+        
+        // Use a UUID for a unique resource ID
+        String resourceId = UUID.randomUUID().toString().substring(0, 8);
+        
+        StringBuilder url = new StringBuilder();
+        url.append(protocol).append("://").append(domain).append(tld)
+           .append("/").append(path).append("/").append(resourceId);
+
+        // Randomly add a query parameter
+        if (RANDOM.nextBoolean()) {
+            String param = PARAMS[RANDOM.nextInt(PARAMS.length)];
+            url.append("?").append(param).append("=").append(RANDOM.nextInt(1000));
+        }
+
+        return url.toString();
+    }
+
+    public static void main(String[] args) {
+        // Generate 5 random URLs for testing
+        for (int i = 0; i < 5; i++) {
+            System.out.println(generate());
+        }
+    }
+}
