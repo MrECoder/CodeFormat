@@ -1,0 +1,72 @@
+To test this properly, you need to simulate a "waiting" period. Since WebSockets are asynchronous, your test needs to subscribe to a topic and then wait for the RabbitMQ listener to push data to it.
+
+We use a CompletableFuture (or a BlockingQueue) to capture the message when it arrives and "hand it back" to the main test thread for assertion.
+
+The Subscription Test Pattern
+Here is how you can verify the full flow: RabbitMQ Input → Local Persistence → WebSocket Output.
+
+Java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+public class NotificationIntegrationTest {
+
+    @LocalServerPort
+    private int port;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate; // We can use this to trigger the push manually or via the listener
+
+    private WebSocketStompClient stompClient;
+
+    @BeforeEach
+    void setup() {
+        stompClient = new WebSocketStompClient(new StandardWebSocketClient());
+        stompClient.setMessageConverter(new MappingJackson2MessageConverter());
+    }
+
+    @Test
+    public void testNotificationReachesUI() throws Exception {
+        // 1. Setup a way to "catch" the message
+        CompletableFuture<DataRecord> resultKeeper = new CompletableFuture<>();
+        String url = "ws://localhost:" + port + "/your-websocket-endpoint";
+
+        // 2. Connect to the server
+        StompSession session = stompClient.connect(url, new StompSessionHandlerAdapter() {}).get(3, TimeUnit.SECONDS);
+
+        // 3. Subscribe to the topic
+        session.subscribe("/topic/notifications", new StompFrameHandler() {
+            @Override
+            public Type getPayloadType(StompHeaders headers) {
+                return DataRecord.class; // The POJO you are sending
+            }
+
+            @Override
+            public void handleFrame(StompHeaders headers, Object payload) {
+                resultKeeper.complete((DataRecord) payload); // Catch the data!
+            }
+        });
+
+        // 4. Trigger the message (simulate the RabbitMQ listener firing)
+        DataRecord sampleData = new DataRecord("ID123", "Update Content");
+        messagingTemplate.convertAndSend("/topic/notifications", sampleData);
+
+        // 5. Assert the result
+        DataRecord received = resultKeeper.get(5, TimeUnit.SECONDS);
+        assertEquals("ID123", received.getId());
+        
+        session.disconnect();
+    }
+}
+Why this test is powerful
+Validates Serialization: If your DataRecord has issues being turned into JSON (or back), this test will fail during the handleFrame step.
+
+Validates Routing: It confirms that your WebSocketConfig is correctly routing messages from the internal broker to the external clients.
+
+Real-world Simulation: It ensures that once your RabbitMQ listener calls messagingTemplate.convertAndSend(), the browser (represented by the test client) actually receives the update.
+
+Troubleshooting the Test
+TimeoutException: If resultKeeper.get() times out, the message never reached the subscriber. Check if the topic names (/topic/notifications) match exactly between the sender and the subscriber.
+
+Connection Refused: Ensure your WebsocketConfig doesn't have a security filter (like Spring Security) blocking the connection during tests.
+
+Would you like me to help you integrate the actual RabbitMQ Mock so the test triggers from a "real" Rabbit message instead of manually calling the template?
