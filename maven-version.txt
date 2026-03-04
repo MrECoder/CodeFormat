@@ -1,0 +1,381 @@
+# Question
+
+I am using SpringBoot Java to build a new micro-services system. Maven is my project management/build tool. Each Micro-service exists as source code in its own Git Repo, as do common dependencies and shared service definitions which are used by the micro-services themselves. 
+
+Git and Build pipelines are managed within GitLab. I am currently moving Maven pom management into an arrangement of a higher pair of pom.xml files one each for a parent and a BOM that is imported by the parent. The parent is referenced from within the pom.xml of each dependency, service etc. 
+
+As we move forward with development of new services (new shared classes in the common modules etc) it is not entirely clear to me how we should control versioning. I am aware that there is a maven version plugin, and I have made provision for involving that in the parent-pom.xml. DevOps believe that we need to maintain version numbers for each maven module in a separate file / env-var which is closely aligned to the GitLab pipeline config (yaml) files and that these files must be 'manually' updated to indicate version incrementation. I, as a developer have never had to do this kind of thing before. This does not mean it was not previously done by what we used to call the 'platform engineering team' or release coordinators, I may have just been unaware of such a process, but don't recall mention of the process in any situation. 
+
+Days past generally used Maven with Jenkins/Hudson. The need for versioning is clear especially when it comes to the organisation of our distribution / artifact repository (Nexus). Maybe I need to know more about Maven Snapshotting? 
+
+Either or any way I could do with your help and a clear and concise explanation which might prevent me coming back with follow-up questions. Any such explanations you are aware of on internet resources would be also gratefully received.
+
+# Answer [ChatGPT)]
+
+You’re asking exactly the right question — because this is **not** just about Maven mechanics, it’s about release strategy and ownership of versioning in a microservices + GitLab environment.
+
+I’ll give you:
+
+1. ✅ How Maven versioning *normally* works
+2. ✅ What SNAPSHOT really means
+3. ✅ How BOM + parent affects versioning
+4. ✅ Whether version-in-a-separate-file is necessary
+5. ✅ Recommended strategy for GitLab + Nexus + microservices
+6. ✅ A clear, opinionated conclusion
+
+---
+
+# 1️⃣ How Maven Versioning Normally Works
+gitgithub
+In standard Maven practice:
+
+* Every artifact has a version in its `pom.xml`
+* Version is changed using:
+
+  ```bash
+  mvn versions:set -DnewVersion=1.2.0
+  ```
+* Releases are typically handled by:
+
+  ```bash
+  mvn release:prepare
+  mvn release:perform
+  ```
+
+The **POM is the single source of truth** for versioning.
+
+That has been the Maven philosophy since day one.
+
+---
+
+# 2️⃣ What SNAPSHOT Actually Means (Very Important)
+
+If you have:
+
+```
+1.3.0-SNAPSHOT
+```
+
+This means:
+
+* It is mutable
+* Every build publishes a new timestamped artifact to Nexus
+* Other projects pulling it will always get the latest snapshot
+
+In Nexus, it becomes:
+
+```
+1.3.0-20260304.101233-4
+```
+
+Snapshots are for:
+
+* Active development
+* Inter-service integration during development
+
+Releases are:
+
+```
+1.3.0
+```
+
+They are immutable and safe for production.
+
+### Best practice in microservices:
+
+* `main` branch → SNAPSHOT
+* Release branch or tag → Release version
+* Only releases deployed to production
+
+---
+
+# 3️⃣ Parent + BOM Structure
+
+You described:
+
+```
+Parent POM
+   imports BOM
+      defines versions
+Microservices reference Parent
+```
+
+This is correct and modern.
+
+Version flow looks like:
+
+```
+Parent version
+    ↓
+BOM version
+    ↓
+Dependency versions
+```
+
+Important:
+
+Each microservice still has its own `<version>`.
+
+Even with a parent, the microservice artifact must have a version.
+
+---
+
+# 4️⃣ The DevOps Proposal: Version in Separate File / Env Var
+
+This approach usually means:
+
+* Version stored in something like:
+
+  * `version.txt`
+  * GitLab CI variable
+  * YAML file
+* Pipeline injects version into Maven during build:
+
+  ```bash
+  mvn versions:set -DnewVersion=$CI_VERSION
+  ```
+
+This is common in:
+
+* Large enterprises
+* GitOps-heavy environments
+* Container-first deployments
+* Strict CI/CD governance
+
+BUT…
+
+It is not Maven’s native model.
+
+It is CI-driven versioning.
+
+---
+
+# 5️⃣ Why They Might Want That
+
+DevOps is likely optimizing for:
+
+### 🔹 1. Immutable CI pipelines
+
+Version bump happens in pipeline, not by developers.
+
+### 🔹 2. Centralized release control
+
+Prevents rogue version changes.
+
+### 🔹 3. Git tag driven releases
+
+Example:
+
+```
+git tag v1.4.0
+```
+
+Pipeline:
+
+* Extracts tag
+* Sets Maven version
+* Builds
+* Publishes to Nexus
+
+### 🔹 4. Docker alignment
+
+Often Docker image tag = Maven version.
+
+---
+
+# 6️⃣ Do You *Need* That?
+
+Short answer:
+
+👉 No, not strictly.
+
+Maven already solves versioning cleanly inside the POM.
+
+What matters is:
+
+* Who controls releases?
+* How automated do you want it?
+* Are microservices independently released?
+
+---
+
+# 7️⃣ Recommended Strategy for Microservices (Clean + Modern)
+
+Here’s what I recommend for your architecture:
+
+---
+
+## 🔹 A. Each Microservice Owns Its Version
+
+In each microservice:
+
+```xml
+<version>1.0.0-SNAPSHOT</version>
+```
+
+During development → snapshot.
+
+---
+
+## 🔹 B. Use Git Tags for Releases
+
+When ready:
+
+```bash
+git tag 1.0.0
+git push --tags
+```
+
+Pipeline:
+
+1. Detect tag
+2. Run:
+
+   ```bash
+   mvn versions:set -DnewVersion=${CI_COMMIT_TAG}
+   ```
+3. Deploy to Nexus (release repo)
+
+---
+
+## 🔹 C. Use SNAPSHOT for Inter-Service Dev
+
+Shared library:
+
+```
+common-lib: 1.2.0-SNAPSHOT
+```
+
+Services consume snapshot during dev.
+
+When stable:
+
+```
+common-lib: 1.2.0
+```
+
+Services upgrade intentionally.
+
+This avoids hidden breaking changes.
+
+---
+
+## 🔹 D. BOM Strategy
+
+Only the BOM controls dependency versions.
+
+Microservices:
+
+```xml
+<dependencyManagement>
+    <dependency>
+        <groupId>com.myorg</groupId>
+        <artifactId>platform-bom</artifactId>
+        <version>2.1.0</version>
+        <type>pom</type>
+        <scope>import</scope>
+    </dependency>
+</dependencyManagement>
+```
+
+When shared libs change → release new BOM version.
+
+Microservices opt into upgrade.
+
+That is clean version governance.
+
+---
+
+# 8️⃣ What I Would Avoid
+
+❌ Manually editing version files in multiple places
+❌ Forcing developers to increment versions by hand in YAML
+❌ Tightly coupling GitLab YAML and Maven model
+❌ Automatic silent version bumps
+
+Those approaches often create more operational confusion.
+
+---
+
+# 9️⃣ Snapshot vs Release — Simple Rule
+
+| State | Version          | Nexus Repo |
+| ----- | ---------------- | ---------- |
+| Dev   | `1.2.0-SNAPSHOT` | snapshots  |
+| QA    | `1.2.0-RC1`      | releases   |
+| Prod  | `1.2.0`          | releases   |
+
+Keep it simple.
+
+---
+
+# 🔟 The Real Question: Governance Model
+
+You and DevOps are really debating:
+
+**Code-driven versioning vs Pipeline-driven versioning**
+
+Both work.
+
+But in Maven ecosystems, the cleanest approach remains:
+
+> 📌 The POM is the source of truth.
+> 📌 Git tags trigger releases.
+> 📌 SNAPSHOT for development.
+> 📌 Immutable releases in Nexus.
+
+---
+
+# 11️⃣ Final Opinion 
+
+Your instinct is correct.
+
+What DevOps is proposing is a CI-governed versioning model — not wrong, but not required.
+
+If:
+
+* Microservices are independently deployable
+* Teams own their services
+* You use Nexus properly
+
+Then normal Maven versioning + Git tags is entirely sufficient and industry standard.
+
+---
+
+# 12️⃣ A Clean Compromise
+
+You can agree to:
+
+* Versions live in POM
+* Pipeline enforces:
+
+  * No release without Git tag
+  * No SNAPSHOT deployed to release repo
+* Version bump automated using Maven Versions Plugin
+* No manual YAML version tracking
+
+That keeps governance but avoids unnatural duplication.
+
+---
+
+# Short Summary
+
+You do NOT need:
+
+> Separate manual version files aligned to GitLab YAML.
+
+Unless your organisation wants strict central release orchestration.
+
+Otherwise:
+
+> Use Maven the way it was designed.
+
+---
+
+If you’d like, I can next provide:
+
+* A concrete GitLab CI YAML example
+* A recommended multi-repo version flow diagram
+* Or a “gold standard” microservice Maven structure template
+
+Just tell me which direction you want.
