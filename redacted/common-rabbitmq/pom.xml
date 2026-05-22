@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>redacted.group.id</groupId>
+        <artifactId>redacted-parent</artifactId>
+        <version>${revision}${changelist}</version>
+        <relativePath/>
+    </parent>
+    
+    <groupId>redacted.group.id</groupId>
+    <artifactId>common-rabbitmq-components</artifactId>
+    <!-- Version inherited from parent -->
+    <name>common-rabbitmq-components</name>
+    <description>Library of shared DOE Java RabbitMQ specific components</description>
+    
+    <!-- ======================================================== -->
+    <!-- REQUIRED: CI-Friendly Version Properties                 -->
+    <!-- ======================================================== -->
+    <properties>
+        <revision>0.0.1</revision>
+        <changelist>-SNAPSHOT</changelist>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+    
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- JSON library (version managed in BOM)                    -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Internal dependencies - NO VERSION SPECIFIED             -->
+        <!-- Managed by BOM via dependencyManagement                  -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>redacted.group.id</groupId>
+            <artifactId>common-java-components</artifactId>
+            <!-- Version managed by BOM -->
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Test Scoped dependencies                                 -->
+        <!-- ======================================================== -->
+                
+    </dependencies> 
+
+    <build>
+        <plugins>     
+            <!-- ============================================ -->
+            <!-- Spotless - inherits from parent              -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Flatten Plugin                               -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/redacted/common-rabbitmq-components</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshot</id>
+            <url>https://nexus.electra.lan/repository/redacted</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+</project>
