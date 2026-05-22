@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>redacted.group.id</groupId>
+        <artifactId>redacted-parent</artifactId>
+        <version>${revision}${changelist}</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>redacted.group.id</groupId>
+    <artifactId>common-java-components</artifactId>
+    <!-- Version inherited from parent - DO NOT specify here -->
+    <name>common-java-components</name>
+    <description>Shared Java components, DTOs, messages, exceptions, and utilities.</description>
+    <packaging>jar</packaging>
+
+    <!-- ======================================================== -->
+    <!-- REQUIRED: CI-Friendly Version Properties                 -->
+    <!-- Must be present in all child POMs                        -->
+    <!-- ======================================================== -->
+    <properties>
+        <revision>0.0.1</revision>
+        <changelist>-SNAPSHOT</changelist>
+    </properties>
+
+    <dependencies>
+
+        <!-- ======================================================== -->
+        <!-- Messaging annotations if your DTOs use them              -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-messaging</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Spring RabbitMQ types if exporting message classes       -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Lombok only for compile-time, not exported               -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- JSON library (version managed in BOM)                    -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Test Scoped dependencies                                 -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>    
+
+    <build>
+        <plugins>    
+            <!-- ============================================ -->
+            <!-- Spotless - inherits config from parent       -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <!-- Configuration inherited from parent pluginManagement -->
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Flatten Plugin - inherits from parent        -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <!-- Configuration inherited from parent pluginManagement -->
+            </plugin>
+        </plugins>
+    </build>
+    
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/redacted/common-java-components</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshot</id>
+            <url>https://nexus.electra.lan/repository/redacted</url>
+        </snapshotRepository>
+    </distributionManagement>
+</project>
