@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>redacted.group.id</groupId>
+        <artifactId>redacted-parent</artifactId>
+        <version>${revision}${changelist}</version>
+        <relativePath/>
+    </parent>
+    
+    <groupId>redacted.group.id</groupId>
+    <artifactId>common-notification-service</artifactId>
+    <!-- Version inherited from parent -->
+    <name>common-notification-service</name>
+    <description>Websocket notification services for dependent Microservices</description>
+    
+    <!-- ======================================================== -->
+    <!-- REQUIRED: CI-Friendly Version Properties                 -->
+    <!-- ======================================================== -->
+    <properties>
+        <revision>0.0.1</revision>
+        <changelist>-SNAPSHOT</changelist>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+        </dependency>  
+        
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Websocket Scoped dependencies                            -->
+        <!-- ======================================================== -->
+         
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>            
+        </dependency>
+        
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>            
+        </dependency>   
+
+        <!-- ======================================================== -->
+        <!-- Internal Dependencies - NO VERSION                       -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>redacted.group.id</groupId>
+            <artifactId>common-java-components</artifactId>
+            <!-- Version managed by BOM -->
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Test Scoped dependencies                                 -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+                
+    </dependencies>
+
+    <build>   
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Spotless                                     -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Flatten Plugin                               -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/redacted/common-notification-service</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshot</id>
+            <url>https://nexus.electra.lan/repository/redacted</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+</project>
