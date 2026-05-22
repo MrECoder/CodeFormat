@@ -17,6 +17,1252 @@ The above is so unwieldy due to all the editing of tags within pom files and the
 I will also provide a copy of the gitlab-ci file for the java projects.
 One other thing that I find odd is that the pipelines do not preserve the Jar files of the microservice projects on Nexus, but the dependencies' Jars are actvinevineually saved there. The reason being given is that the Jars are bound into Docker images which are retained in a separate Nexus repo. I do not know if this is good practice or not, but I have one time found my self wanting to see the contents of a released Jar Manifest.mf, and it was not available.I shall add the pom.xml files in the next message I sdend to you and then the gitlab-ci.yml
 
+DATA
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+    <artifactId>fcas-sos-doe-bom</artifactId>
+    <version>0.0.1</version>
+    <packaging>pom</packaging>
+
+    <name>fcas-sos-doe-bom</name>
+    <description>Centralized dependency versions for all microservices.</description>
+
+    <!-- ============================================================ -->
+    <!-- Properties Block for ability to locally overwrite from repos -->
+    <!-- ============================================================ -->
+
+    <properties>
+        <code-style.version>0.0.1-xian.young7</code-style.version>
+        <common-java-components.version>0.0.1-xian.young7</common-java-components.version>
+        <common-rabbitmq-components.version>0.0.1-xian.young7</common-rabbitmq-components.version>
+        <common-notification-service.version>0.0.1-xian.young7</common-notification-service.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+
+            <!-- ======================================================== -->
+            <!-- Compile Time Dependencies                                -->
+            <!-- ======================================================== -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>1.18.42</version> 
+            </dependency>
+
+            <!-- ======================================================== -->
+            <!-- Import Spring Boot's BOM                                 -->
+            <!-- ======================================================== -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>3.5.6</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- ======================================================== -->
+            <!-- Optional: SpringDoc version                              -->
+            <!-- ======================================================== -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>2.5.0</version>
+            </dependency>
+
+            <!-- ======================================================== -->
+            <!-- Internal common components                               -->
+            <!-- ======================================================== -->
+            <dependency>
+                <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+                <artifactId>code-style</artifactId>
+                <version>${code-style.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+                <artifactId>common-java-components</artifactId>
+                <version>${common-java-components.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+                <artifactId>common-rabbitmq-components</artifactId>
+                <version>${common-rabbitmq-components.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+                <artifactId>common-notification-service</artifactId>
+                <version>${common-notification-service.version}</version>
+            </dependency>
+
+            <!-- ======================================================== -->
+            <!-- Test dependencies                                        -->
+            <!-- ======================================================== -->
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>4.13.2</version>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- ======================================================== -->
+    <!-- Central distribution management                          -->
+    <!-- ======================================================== -->
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+	    <url>https://nexus.electra.lan/repository/fcas-sos-doe/parent-pom</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshot</id>
+            <url>https://nexus.electra.lan/repository/fcas-sos-doe</url>
+        </snapshotRepository>
+    </distributionManagement>
+</project><?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+    <artifactId>fcas-sos-doe-parent</artifactId>
+    <version>0.0.1</version>
+    <packaging>pom</packaging>
+
+    <name>fcas-sos-doe-parent</name>
+    <description>Shared build configuration for all microservices.</description>
+
+    <!-- ======================================================== -->
+    <!-- Shared version properties                                -->
+    <!-- ======================================================== -->
+    <properties>
+        <java.version>25</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>25</maven.compiler.release>
+    </properties>
+
+    <!-- ======================================================== -->
+    <!-- Dependency management imports the company BOM            -->
+    <!-- ======================================================== -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+                <artifactId>fcas-sos-doe-bom</artifactId>
+                <version>0.0.1</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+
+    <!-- ======================================================== -->
+    <!-- Build phase                                              -->
+    <!-- ======================================================== -->
+    <build>
+        <pluginManagement>
+            <plugins>
+
+                <!-- ============================================ -->
+                <!-- Dependency plugin                            -->
+                <!-- ============================================ -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>unpack-code-style</id>
+                            <phase>generate-resources</phase>
+                            <!-- <phase>initialize</phase> -->
+                            <goals>
+                                <goal>unpack</goal>
+                            </goals>
+                            <configuration>
+                                <artifactItems>
+                                    <artifactItem>
+                                        <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+                                        <artifactId>code-style</artifactId>
+                                        <version>0.0.1</version>
+                                        <outputDirectory>${project.build.directory}/code-style</outputDirectory>
+                                    </artifactItem>
+                                </artifactItems>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- ============================================ -->
+                <!-- Spotless plugin                              -->
+                <!-- ============================================ -->
+<plugin>
+    <groupId>com.diffplug.spotless</groupId>
+    <artifactId>spotless-maven-plugin</artifactId>
+    <version>2.43.0</version>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>code-style</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency>
+    </dependencies>
+
+    <configuration>
+        <java>
+            <eclipse>
+                <file>classpath:/eclipse-java-formatter.xml</file>
+            </eclipse>
+        </java>
+    </configuration>
+</plugin>
+            </plugins>
+        </pluginManagement>
+
+        <plugins>
+            
+            <!-- ============================================ -->
+            <!-- Compiler plugin                              -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>${maven.compiler.release}</release>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.42</version>
+                        </path>
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                            <version>3.5.6</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+            
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>${start-class}</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+
+
+            <!-- ============================================ -->
+            <!-- Spring Boot plugin                           -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>3.5.6</version>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Testing plugins                              -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Enforcer plugin                              -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>enforce</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>${java.version}</version>
+                                </requireJavaVersion>
+                                <dependencyConvergence/>
+                            </rules>
+                        </configuration>
+                    </execution>
+    
+                    <execution>
+                        <id>no-snapshots</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireReleaseDeps>
+                                    <message>No SNAPSHOTs allowed in release builds!</message>
+                                    <onlyWhenRelease>true</onlyWhenRelease>
+                                </requireReleaseDeps>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Versions plugin                              -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.21.0</version>
+
+                <configuration>
+                    <!-- Prevents version updates during normal builds -->
+                    <generateBackupPoms>true</generateBackupPoms>
+
+                    <!-- Ensures only properties controlling versions are updated -->
+                    <processDependencies>true</processDependencies>
+                    <processDependencyManagement>true</processDependencyManagement>
+                    <processPluginDependencies>true</processPluginDependencies>
+
+                    <!-- Prevent updating SNAPSHOTs unless explicitly requested -->
+                    <allowSnapshots>false</allowSnapshots>
+
+                    <!-- Avoid updating BOM-imported constraints unless requested -->
+                    <includes>
+                        <include>*:*</include>
+                    </includes>
+
+                    <!-- Follow semantic versioning safely -->
+                    <ruleSet>
+                        <rules>
+                            <requireReleaseDeps>
+                                <!--
+                                <message>No SNAPSHOT dependencies allowed unless explicitly permitted</message>
+                                <failWhenSnapshotsFound>true</failWhenSnapshotsFound>
+                                -->
+                            </requireReleaseDeps>
+                        </rules>
+                    </ruleSet>
+                </configuration>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Release plugin                               -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>3.0.1</version>
+                <configuration>
+                    <!-- Use custom tag format -->
+                    <tagNameFormat>v@{project.version}</tagNameFormat>
+    
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+    
+                    <!-- Release profile to activate during release -->
+                    <releaseProfiles>release</releaseProfiles>
+    
+                    <!-- Goals to execute during release:perform -->
+                    <goals>deploy</goals>
+                    
+                    <checkModificationExcludes>
+                        <checkModificationExclude>pom.xml</checkModificationExclude>
+                    </checkModificationExcludes>
+                </configuration>
+            </plugin>
+
+        </plugins>
+    </build>
+    
+
+    <!-- ======================================================== -->
+    <!-- Central distribution management                          -->
+    <!-- ======================================================== -->
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/fcas-sos-doe/parent-pom</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshot</id>
+            <url>https://nexus.electra.lan/repository/fcas-sos-doe</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+</project><?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+    <artifactId>fcas-sos-doe-aggregator</artifactId>
+    <version>0.0.1</version>
+    <packaging>pom</packaging>
+
+    <name>fcas-sos-doe-aggregator</name>
+    <description>Build aggregator for all microservices and shared components.</description>
+
+    <modules>
+    	<module>./code-style</module>
+        <module>./bom</module>
+        <module>./parent</module>
+
+        <!-- ======================================================== -->
+        <!-- Shared Libraries                                         -->
+        <!-- ======================================================== -->
+	    <module>../common-java-components</module>
+	    <module>../common-rabbitmq-components</module>
+	    <module>../common-notification-service</module>
+
+        <!-- ======================================================== -->
+        <!-- Microservices                                            -->
+        <!-- ======================================================== -->
+	    <module>../application-catalogue-service</module>
+        <module>../application-instance-access-service</module>
+    </modules>
+
+    <!-- ======================================================== -->
+    <!-- Central distribution management                          -->
+    <!-- ======================================================== -->
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/fcas-sos-doe/parent-pom</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshot</id>
+            <url>https://nexus.electra.lan/repository/fcas-sos-doe</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+</project><?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+  <artifactId>code-style</artifactId>
+  <version>0.0.1</version>
+  <packaging>jar</packaging>
+
+  <name>Code Style Definitions</name>
+
+    <!-- ======================================================== -->
+    <!-- Central distribution management                          -->
+    <!-- ======================================================== -->
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/fcas-sos-doe/parent-pom</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshot</id>
+            <url>https://nexus.electra.lan/repository/fcas-sos-doe</url>
+        </snapshotRepository>
+    </distributionManagement>
+</project>
+
+The above 4 are all in the parent pom git repo.<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+        <artifactId>fcas-sos-doe-parent</artifactId>
+        <version>0.0.1-xian.young7</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+    <artifactId>common-java-components</artifactId>
+    <version>0.0.1-xian.young7</version>
+    <name>common-java-components</name>
+    <description>Shared Java components, DTOs, messages, exceptions, and utilities.</description>
+    <packaging>jar</packaging>
+
+    <dependencies>
+
+        <!-- ======================================================== -->
+        <!-- Messaging annotations if your DTOs use them              -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-messaging</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Spring RabbitMQ types if exporting message classes       -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Internal Dependency for centralised code format rule set -->
+        <!-- ======================================================== -->
+        <!-- <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>code-style</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency> -->
+
+        <!-- ======================================================== -->
+        <!-- Lombok only for compile-time, not exported               -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.42</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- JSON library (version managed in BOM)                    -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Test Scoped dependencies                                 -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>    
+
+    <build>
+        <plugins>    
+            <plugin>
+
+  <groupId>com.diffplug.spotless</groupId>
+  <artifactId>spotless-maven-plugin</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+      <artifactId>code-style</artifactId>
+      <version>0.0.1-xian.young7</version>
+    </dependency>
+  </dependencies>
+
+  <configuration>
+    <java>
+      <eclipse>
+        <file>classpath:/eclipse-java-formatter.xml</file>
+      </eclipse>
+    </java>
+  </configuration>
+
+            </plugin>
+        </plugins>
+    </build>
+    
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/fcas-sos-doe/common-java-components</url>
+        </repository>
+    </distributionManagement>
+</project>
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+        <artifactId>fcas-sos-doe-parent</artifactId>
+        <version>0.0.1-xian.young7</version>
+	<relativePath/>
+    </parent>
+    
+    <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+    <artifactId>common-rabbitmq-components</artifactId>
+    <version>0.0.1-xian.young7</version>
+    <name>common-rabbitmq-components</name>
+    <description>Library of shared DOE Java RabbitMQ specific components</description>
+    
+    <dependencies>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.42</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+    
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- JSON library (version managed in BOM)                    -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Internal dependencies                                    -->
+        <!-- ======================================================== -->
+
+        <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>common-java-components</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Internal Dependency for centralised code format rule set -->
+        <!-- ======================================================== -->
+        <!-- <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>code-style</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency> -->
+
+        <!-- ======================================================== -->
+        <!-- Test Scoped dependencies                                 -->
+        <!-- ======================================================== -->
+                
+    </dependencies> 
+
+    <build>
+        <plugins>     
+            <plugin>
+
+  <groupId>com.diffplug.spotless</groupId>
+  <artifactId>spotless-maven-plugin</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+      <artifactId>code-style</artifactId>
+      <version>0.0.1-xian.young7</version>
+    </dependency>
+  </dependencies>
+
+  <configuration>
+    <java>
+      <eclipse>
+        <file>classpath:/eclipse-java-formatter.xml</file>
+      </eclipse>
+    </java>
+  </configuration>
+
+            </plugin>
+        </plugins>
+    </build>
+
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/fcas-sos-doe/common-rabbitmq-components</url>
+        </repository>
+    </distributionManagement>
+
+</project><?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+        <artifactId>fcas-sos-doe-parent</artifactId>
+        <version>0.0.1-xian.young7</version>
+	    <relativePath/>
+    </parent>
+    
+    <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+    <artifactId>common-notification-service</artifactId>
+    <version>0.0.1-xian.young7</version>
+    <name>common-notification-service</name>
+    <description>Websocket notification services for dependent Microservices</description>
+    
+    <dependencies>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+        </dependency>  
+        
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.42</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Websocket Scoped dependencies                            -->
+        <!-- ======================================================== -->
+         
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>            
+        </dependency>
+        
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>            
+        </dependency>   
+
+        <!-- ======================================================== -->
+        <!-- Internal Dependencies                                    -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>common-java-components</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Internal Dependency for centralised code format rule set -->
+        <!-- ======================================================== -->
+
+        <!-- <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>code-style</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency> -->
+
+        <!-- ======================================================== -->
+        <!-- Test Scoped dependencies                                 -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+                
+    </dependencies>
+
+    <build>   
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+
+  <groupId>com.diffplug.spotless</groupId>
+  <artifactId>spotless-maven-plugin</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+      <artifactId>code-style</artifactId>
+      <version>0.0.1-xian.young7</version>
+    </dependency>
+  </dependencies>
+
+  <configuration>
+    <java>
+      <eclipse>
+        <file>classpath:/eclipse-java-formatter.xml</file>
+      </eclipse>
+    </java>
+  </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/fcas-sos-doe/common-notification-service</url>
+        </repository>
+    </distributionManagement>
+
+</project><?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+        <artifactId>fcas-sos-doe-parent</artifactId>
+        <version>0.0.1-xian.young7</version>
+	    <relativePath/>
+    </parent>
+
+    <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+    <artifactId>application-catalogue-service</artifactId>
+    <version>0.0.1</version>
+    <packaging>jar</packaging>
+    <name>application-catalogue-service</name>
+    <description>Application Registration service and broadcast notifier</description>
+
+    <properties>
+        <java.version>25</java.version>
+        <!--springdoc.version>1.7.0</springdoc.version-->
+        <springdoc.version>2.5.0</springdoc.version>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Internal Dependencies                                    -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>common-java-components</artifactId>
+        <version>0.0.1-xian.young7</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>common-rabbitmq-components</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>common-notification-service</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Internal Dependency for centralised code format rule set -->
+        <!-- ======================================================== -->
+
+        <!-- <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>code-style</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency> -->
+
+        <!-- ======================================================== -->
+        <!-- Test Scoped dependencies                                 -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <mainClass>com.baesystems.air.fcas.sos.doe.catalogue.CatalogueServiceApplication</mainClass>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+            </plugin>
+
+            <plugin>
+  <groupId>com.diffplug.spotless</groupId>
+  <artifactId>spotless-maven-plugin</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+      <artifactId>code-style</artifactId>
+      <version>0.0.1-xian.young7</version>
+    </dependency>
+  </dependencies>
+
+  <configuration>
+    <java>
+      <eclipse>
+        <file>classpath:/eclipse-java-formatter.xml</file>
+      </eclipse>
+    </java>
+  </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/fcas-sos-doe/application-catalogue-service</url>
+        </repository>
+    </distributionManagement>
+
+</project><?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+        <artifactId>fcas-sos-doe-parent</artifactId>
+        <version>0.0.1-xian.young7</version>
+	    <relativePath/>
+    </parent>
+
+    <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+    <artifactId>application-instance-access-service</artifactId>
+    <version>0.0.1</version>
+    <packaging>jar</packaging>
+    <name>application-instance-access-service</name>
+    <description>DOE Capability Services</description>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.5.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.rabbitmq</groupId>
+            <artifactId>http-client</artifactId>
+            <version>5.3.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Internal Dependencies                                    -->
+        <!-- ======================================================== -->
+
+        <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>common-java-components</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>common-notification-service</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>common-rabbitmq-components</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Internal Dependency for centralised code format rule set -->
+        <!-- ======================================================== -->
+
+        <!-- <dependency>
+            <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+            <artifactId>code-style</artifactId>
+            <version>0.0.1-xian.young7</version>
+        </dependency> -->
+
+        <!-- ======================================================== -->
+        <!-- Test Scoped dependencies                                 -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <parameters>true</parameters>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <mainClass>com.baesystems.air.fcas.sos.doe.appinstanceaccess.ApplicationInstanceAccessApplication</mainClass>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+            </plugin>
+
+            <plugin>
+  <groupId>com.diffplug.spotless</groupId>
+  <artifactId>spotless-maven-plugin</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.baesystems.air.fcas.sos.doe</groupId>
+      <artifactId>code-style</artifactId>
+      <version>0.0.1-xian.young7</version>
+    </dependency>
+  </dependencies>
+
+  <configuration>
+    <java>
+      <eclipse>
+        <file>classpath:/eclipse-java-formatter.xml</file>
+      </eclipse>
+    </java>
+  </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>That is now all of the pom files, not the bloat in the last one, not sure what happened there.Now an example of the gitlab-ci a lot of inclusions which re invisible to you sadly include:
+  - project: 'fcas-sos/platform/doe-deployment'
+    ref:  main
+    file: "main.yml"
+  - project: 'airlabs/infrastructure/axiom'
+    ref: v1.0.0.beta9
+    file: 'pipeline/maintenance.yaml'
+  - project: 'airlabs/collective/utils'
+    ref: main
+    file: '.pipelines/docker-tasks.yml'
+
+variables:
+    COMPOSE_BRANCH: ""
+    COMMON_JAVA_COMPONENTS_VERSION: ""
+    COMMON_RABBITMQ_COMPONENTS_VERSION: ""
+    COMMON_NOTIFICATION_SERVICE_VERSION: ""
+
+clone-deployment-repo:
+  extends: 
+    - .clone-deployment-repo
+
+identify-user:
+  extends: .identify-user
+
+validate-merge-policy:
+  extends: .validate-merge-policy
+
+set-image-tag:
+  extends: .set-image-tag
+
+extract-maven-app-version:
+  extends: .extract-maven-app-version
+
+prepare-maven-args:
+  extends: .prepare-maven-args
+
+maven-install:
+  extends: .maven-install
+  needs:
+    - prepare-maven-args
+
+docker-build:
+  extends: .docker-build
+  needs:
+    - !reference [.docker-build, needs]
+    - maven-install
+  dependencies:
+    - set-image-tag
+    - maven-install
+
+docker-push:
+  extends: .docker-push
+  needs:
+    - !reference [.docker-push, needs]
+  dependencies:
+    - set-image-tag
+    - docker-build
+    
+docker-release:
+  extends: .docker-release
+  needs:
+    - maven-install
+  dependencies:
+    - maven-install
+
+set-target-ip:
+  extends: .set-target-ip
+
+deploy-to-target:
+  extends: 
+    - .deploy-to-target
+
 
 ANSWER
 
