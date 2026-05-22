@@ -1,0 +1,103 @@
+# .gitlab-ci.yml for Parent POM Repository
+#
+# This repository contains:
+# - bom/pom.xml
+# - parent/pom.xml
+# - aggregator/pom.xml
+# - code-style/pom.xml
+
+variables:
+  MAVEN_CLI_OPTS: "--batch-mode --errors --fail-at-end --show-version"
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  REVISION: "0.0.1"
+  CHANGELIST: ""
+
+stages:
+  - .pre
+  - build
+  - deploy
+
+# Calculate version
+calculate-version:
+  stage: .pre
+  image: alpine:latest
+  script:
+    - |
+      export REVISION="0.0.1"
+      
+      if [ "${CI_COMMIT_REF_NAME}" = "main" ]; then
+        export CHANGELIST="-SNAPSHOT"
+      elif [ "${CI_COMMIT_TAG}" ]; then
+        export CHANGELIST=""
+        export REVISION="${CI_COMMIT_TAG#v}"
+      else
+        export CHANGELIST="-SNAPSHOT-dev"
+      fi
+      
+      echo "REVISION=${REVISION}" >> build.env
+      echo "CHANGELIST=${CHANGELIST}" >> build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+
+# Build all POMs via aggregator
+build-all:
+  stage: build
+  image: maven:3.9-eclipse-temurin-21
+  needs:
+    - calculate-version
+  script:
+    - |
+      echo "Building parent POM repository"
+      echo "Version: ${REVISION}${CHANGELIST}"
+      
+      cd aggregator
+      mvn ${MAVEN_CLI_OPTS} clean install \
+        -Drevision=${REVISION} \
+        -Dchangelist=${CHANGELIST}
+  cache:
+    key: parent-pom-build
+    paths:
+      - .m2/repository
+
+# Deploy all artifacts to Nexus
+deploy-all:
+  stage: deploy
+  image: maven:3.9-eclipse-temurin-21
+  needs:
+    - build-all
+  script:
+    - |
+      echo "Deploying parent POMs to Nexus"
+      
+      # Deploy in order: code-style, BOM, parent, aggregator
+      cd code-style
+      mvn ${MAVEN_CLI_OPTS} deploy \
+        -Drevision=${REVISION} \
+        -Dchangelist=${CHANGELIST} \
+        -DskipTests=true
+      
+      cd ../bom
+      mvn ${MAVEN_CLI_OPTS} deploy \
+        -Drevision=${REVISION} \
+        -Dchangelist=${CHANGELIST}
+      
+      cd ../parent
+      mvn ${MAVEN_CLI_OPTS} deploy \
+        -Drevision=${REVISION} \
+        -Dchangelist=${CHANGELIST}
+      
+      cd ../aggregator
+      mvn ${MAVEN_CLI_OPTS} deploy \
+        -Drevision=${REVISION} \
+        -Dchangelist=${CHANGELIST}
+      
+      echo "All parent POMs deployed"
+  cache:
+    key: parent-pom-build
+    paths:
+      - .m2/repository
+    policy: pull
+  only:
+    - main
+    - tags
