@@ -1,5 +1,7 @@
 ╔═══════════════════════════════════════════════════════════╗
+
 ║         CI-FRIENDLY VERSIONS QUICK REFERENCE              ║
+
 ╚═══════════════════════════════════════════════════════════╝
 
 POM STRUCTURE
@@ -53,5 +55,7 @@ Slack:   #engineering-maven-migration
 Support: [email]
 
 ╔═══════════════════════════════════════════════════════════╗
+
 ║  NO MORE MANUAL VERSION EDITING! LET CI/CD HANDLE IT!    ║
+
 ╚═══════════════════════════════════════════════════════════╝
