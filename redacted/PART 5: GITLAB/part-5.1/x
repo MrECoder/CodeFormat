@@ -1,1 +1,510 @@
+# .gitlab-ci.yml for Java Spring Boot Projects with CI-Friendly Versions
+#
+# This configuration supports:
+# - Dynamic version calculation based on branch/user
+# - Maven builds with CI-friendly versions
+# - Docker image building and deployment
+# - Automatic artifact deployment to Nexus
+#
+# Version: 2.0.0
+# Last Updated: 2024
 
+# ============================================================
+# Include shared pipeline templates
+# ============================================================
+include:
+  - project: 'redacted-/platform/doe-deployment'
+    ref: main
+    file: "main.yml"
+  - project: 'redacted/infrastructure/axiom'
+    ref: v1.0.0.beta9
+    file: 'pipeline/maintenance.yaml'
+  - project: 'redacted/collective/utils'
+    ref: main
+    file: '.pipelines/docker-tasks.yml'
+
+# ============================================================
+# Global Variables
+# ============================================================
+variables:
+  # Maven configuration
+  MAVEN_CLI_OPTS: "--batch-mode --errors --fail-at-end --show-version"
+  MAVEN_OPTS: >-
+    -Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository
+    -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=WARN
+    -Dorg.slf4j.simpleLogger.showDateTime=true
+    -Djava.awt.headless=true
+  
+  # Version properties (injected by calculate-version stage)
+  REVISION: "0.0.1"
+  CHANGELIST: ""
+  FULL_VERSION: ""
+  
+  # Docker and deployment variables (set by downstream jobs)
+  COMPOSE_BRANCH: ""
+  IMAGE_TAG: ""
+
+# ============================================================
+# Pipeline Stages
+# ============================================================
+stages:
+  - .pre              # Pre-flight checks
+  - validate          # Validation and setup
+  - build             # Maven build and test
+  - package           # Docker image creation
+  - deploy            # Deployment to environments
+  - .post             # Cleanup and reporting
+
+# ============================================================
+# Stage: .pre - Version Calculation
+# ============================================================
+
+# Calculate version based on branch, user, and context
+calculate-version:
+  stage: .pre
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git
+  script:
+    - |
+      echo "=== CI-Friendly Version Calculation ==="
+      echo "Branch: ${CI_COMMIT_REF_NAME}"
+      echo "User: ${GITLAB_USER_LOGIN}"
+      echo "Commit: ${CI_COMMIT_SHORT_SHA}"
+      
+      # Base revision (matches POM files)
+      export REVISION="0.0.1"
+      
+      # Calculate changelist based on context
+      if [ "${CI_COMMIT_REF_NAME}" = "main" ] || [ "${CI_COMMIT_REF_NAME}" = "master" ]; then
+        # Main branch: use SNAPSHOT for ongoing development
+        export CHANGELIST="-SNAPSHOT"
+        echo "Context: Main branch build"
+        
+      elif [ -n "${CI_MERGE_REQUEST_IID}" ]; then
+        # Merge Request: use MR number for traceability
+        export CHANGELIST="-SNAPSHOT-MR${CI_MERGE_REQUEST_IID}"
+        echo "Context: Merge Request #${CI_MERGE_REQUEST_IID}"
+        
+      elif [ "${CI_COMMIT_TAG}" ]; then
+        # Tagged release: no changelist (pure version)
+        export CHANGELIST=""
+        export REVISION="${CI_COMMIT_TAG#v}"  # Remove 'v' prefix if present
+        echo "Context: Tagged release ${CI_COMMIT_TAG}"
+        
+      else
+        # Feature branch: use username and sanitized branch name
+        BRANCH_SLUG=$(echo "${CI_COMMIT_REF_SLUG}" | sed 's/[^a-zA-Z0-9-]/-/g' | cut -c1-30)
+        USER_SLUG=$(echo "${GITLAB_USER_LOGIN}" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-15)
+        export CHANGELIST="-SNAPSHOT-${USER_SLUG}-${BRANCH_SLUG}"
+        echo "Context: Feature branch by ${GITLAB_USER_LOGIN}"
+      fi
+      
+      # Construct full version
+      export FULL_VERSION="${REVISION}${CHANGELIST}"
+      
+      echo "=== Version Calculated ==="
+      echo "REVISION: ${REVISION}"
+      echo "CHANGELIST: ${CHANGELIST}"
+      echo "FULL_VERSION: ${FULL_VERSION}"
+      
+      # Export to downstream jobs via dotenv artifact
+      echo "REVISION=${REVISION}" >> build.env
+      echo "CHANGELIST=${CHANGELIST}" >> build.env
+      echo "FULL_VERSION=${FULL_VERSION}" >> build.env
+      
+      # Also set IMAGE_TAG for Docker builds
+      if [ -z "${CHANGELIST}" ]; then
+        # Release build: use version only
+        echo "IMAGE_TAG=${REVISION}" >> build.env
+      else
+        # Snapshot build: use full version + commit SHA for uniqueness
+        echo "IMAGE_TAG=${FULL_VERSION}-${CI_COMMIT_SHORT_SHA}" >> build.env
+      fi
+      
+      echo "IMAGE_TAG=$(cat build.env | grep IMAGE_TAG | cut -d= -f2)"
+      
+  artifacts:
+    reports:
+      dotenv: build.env
+    expire_in: 1 day
+  tags:
+    - docker
+
+# ============================================================
+# Stage: validate - Pre-build Validation
+# ============================================================
+
+# Clone deployment repository (extended from template)
+clone-deployment-repo:
+  stage: validate
+  extends: 
+    - .clone-deployment-repo
+  needs:
+    - calculate-version
+
+# Identify user for audit trail (extended from template)
+identify-user:
+  stage: validate
+  extends: 
+    - .identify-user
+  needs:
+    - calculate-version
+
+# Validate merge request policies (extended from template)
+validate-merge-policy:
+  stage: validate
+  extends: 
+    - .validate-merge-policy
+  needs:
+    - calculate-version
+  only:
+    - merge_requests
+
+# Validate POM files are CI-friendly
+validate-pom-files:
+  stage: validate
+  image: maven:3.9-eclipse-temurin-21
+  needs:
+    - calculate-version
+  script:
+    - |
+      echo "=== Validating POM Files ==="
+      
+      # Check for CI-friendly version syntax
+      if grep -r '\${revision}\${changelist}' pom.xml; then
+        echo "✓ POM uses CI-friendly version syntax"
+      else
+        echo "✗ ERROR: POM does not use CI-friendly versions!"
+        echo "  Expected: <version>\${revision}\${changelist}</version>"
+        exit 1
+      fi
+      
+      # Check for hardcoded user versions (should not exist)
+      if grep -r 'user\.name' pom.xml; then
+        echo "✗ ERROR: POM contains hardcoded user version!"
+        echo "  This should have been removed during migration."
+        exit 1
+      else
+        echo "✓ No hardcoded user versions found"
+      fi
+      
+      # Check for flatten plugin
+      if grep -q 'flatten-maven-plugin' pom.xml; then
+        echo "✓ Flatten plugin configured"
+      else
+        echo "⚠ WARNING: Flatten plugin not found in POM"
+        echo "  This may cause issues with version resolution"
+      fi
+      
+      # Validate POM syntax
+      mvn ${MAVEN_CLI_OPTS} validate \
+        -Drevision=${REVISION} \
+        -Dchangelist=${CHANGELIST}
+      
+      echo "=== POM Validation Complete ==="
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-validation
+    paths:
+      - .m2/repository
+  tags:
+    - docker
+
+# ============================================================
+# Stage: build - Maven Build and Test
+# ============================================================
+
+# Maven clean install with tests
+maven-build-and-test:
+  stage: build
+  image: maven:3.9-eclipse-temurin-21
+  needs:
+    - calculate-version
+    - validate-pom-files
+  before_script:
+    - |
+      echo "=== Maven Build Configuration ==="
+      echo "Version: ${FULL_VERSION}"
+      echo "Maven Options: ${MAVEN_CLI_OPTS}"
+      java -version
+      mvn -version
+  script:
+    - |
+      echo "=== Building with Maven ==="
+      
+      # Clean and install
+      mvn ${MAVEN_CLI_OPTS} clean install \
+        -Drevision=${REVISION} \
+        -Dchangelist=${CHANGELIST} \
+        -DskipTests=false \
+        -Dmaven.test.failure.ignore=false
+      
+      echo "=== Build Complete ==="
+      
+      # Display built artifacts
+      echo "Built artifacts:"
+      find target -type f \( -name "*.jar" -o -name "*.war" \) -exec ls -lh {} \;
+      
+      # Extract version from built artifact
+      if [ -f target/*.jar ]; then
+        JAR_FILE=$(find target -type f -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" | head -1)
+        echo "Primary artifact: ${JAR_FILE}"
+        
+        # Display manifest
+        unzip -p "${JAR_FILE}" META-INF/MANIFEST.MF | head -20
+      fi
+      
+  artifacts:
+    paths:
+      - target/*.jar
+      - target/*.war
+      - target/surefire-reports/
+      - target/failsafe-reports/
+    reports:
+      junit:
+        - target/surefire-reports/TEST-*.xml
+        - target/failsafe-reports/TEST-*.xml
+    expire_in: 1 week
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-build
+    paths:
+      - .m2/repository
+  tags:
+    - docker
+
+# Deploy artifacts to Nexus
+maven-deploy-to-nexus:
+  stage: build
+  image: maven:3.9-eclipse-temurin-21
+  needs:
+    - calculate-version
+    - maven-build-and-test
+  script:
+    - |
+      echo "=== Deploying to Nexus ==="
+      echo "Target: ${FULL_VERSION}"
+      
+      # Deploy artifacts to Nexus
+      mvn ${MAVEN_CLI_OPTS} deploy \
+        -Drevision=${REVISION} \
+        -Dchangelist=${CHANGELIST} \
+        -DskipTests=true \
+        -Dmaven.install.skip=true
+      
+      echo "=== Deployment Complete ==="
+      echo "Artifacts available at:"
+      echo "https://nexus.electra.lan/repository/redacted/${CI_PROJECT_NAME}/${FULL_VERSION}/"
+      
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-build
+    paths:
+      - .m2/repository
+    policy: pull
+  only:
+    - main
+    - merge_requests
+    - tags
+  tags:
+    - docker
+
+# ============================================================
+# Stage: package - Docker Image Building
+# ============================================================
+
+# Build Docker image
+docker-build:
+  stage: package
+  extends: 
+    - .docker-build  # From included template
+  needs:
+    - calculate-version
+    - maven-build-and-test
+  dependencies:
+    - maven-build-and-test
+  variables:
+    # Pass version info to Docker build
+    DOCKER_BUILDKIT: "1"
+  before_script:
+    - |
+      echo "=== Docker Build Configuration ==="
+      echo "Image Tag: ${IMAGE_TAG}"
+      echo "Full Version: ${FULL_VERSION}"
+      echo "Revision: ${REVISION}"
+      echo "Changelist: ${CHANGELIST}"
+  script:
+    - |
+      # Build Docker image with build args
+      docker build \
+        --build-arg APP_VERSION=${FULL_VERSION} \
+        --build-arg REVISION=${REVISION} \
+        --build-arg CHANGELIST=${CHANGELIST} \
+        --build-arg BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+        --build-arg VCS_REF=${CI_COMMIT_SHORT_SHA} \
+        --tag ${CI_REGISTRY_IMAGE}:${IMAGE_TAG} \
+        --tag ${CI_REGISTRY_IMAGE}:latest \
+        .
+      
+      echo "=== Docker Build Complete ==="
+      docker images | grep ${CI_PROJECT_NAME}
+  tags:
+    - docker
+
+# Push Docker image to registry
+docker-push:
+  stage: package
+  extends: 
+    - .docker-push  # From included template
+  needs:
+    - calculate-version
+    - docker-build
+  dependencies:
+    - docker-build
+  script:
+    - |
+      echo "=== Pushing Docker Image ==="
+      echo "Tag: ${IMAGE_TAG}"
+      
+      docker push ${CI_REGISTRY_IMAGE}:${IMAGE_TAG}
+      
+      # Also push 'latest' for main branch
+      if [ "${CI_COMMIT_REF_NAME}" = "main" ]; then
+        docker push ${CI_REGISTRY_IMAGE}:latest
+      fi
+      
+      echo "=== Push Complete ==="
+      echo "Image available at: ${CI_REGISTRY_IMAGE}:${IMAGE_TAG}"
+  only:
+    - main
+    - merge_requests
+    - tags
+  tags:
+    - docker
+
+# Release Docker image (for tagged releases)
+docker-release:
+  stage: package
+  extends: 
+    - .docker-release  # From included template
+  needs:
+    - calculate-version
+    - maven-build-and-test
+  dependencies:
+    - maven-build-and-test
+  script:
+    - |
+      echo "=== Creating Release Image ==="
+      echo "Release Version: ${REVISION}"
+      
+      # Tag as release (no SNAPSHOT suffix)
+      docker tag ${CI_REGISTRY_IMAGE}:${IMAGE_TAG} ${CI_REGISTRY_IMAGE}:${REVISION}
+      docker tag ${CI_REGISTRY_IMAGE}:${IMAGE_TAG} ${CI_REGISTRY_IMAGE}:release-latest
+      
+      docker push ${CI_REGISTRY_IMAGE}:${REVISION}
+      docker push ${CI_REGISTRY_IMAGE}:release-latest
+      
+      echo "=== Release Image Published ==="
+  only:
+    - tags
+  tags:
+    - docker
+
+# ============================================================
+# Stage: deploy - Deployment to Environments
+# ============================================================
+
+# Set target deployment IP
+set-target-ip:
+  stage: deploy
+  extends: 
+    - .set-target-ip
+  needs:
+    - calculate-version
+    - docker-push
+
+# Deploy to target environment
+deploy-to-target:
+  stage: deploy
+  extends: 
+    - .deploy-to-target
+  needs:
+    - calculate-version
+    - set-target-ip
+    - docker-push
+  variables:
+    DEPLOY_VERSION: ${IMAGE_TAG}
+  script:
+    - |
+      echo "=== Deploying to Target Environment ==="
+      echo "Version: ${IMAGE_TAG}"
+      echo "Target IP: ${TARGET_IP}"
+      
+      # Update docker-compose with new image tag
+      ssh ${DEPLOY_USER}@${TARGET_IP} \
+        "cd ${DEPLOY_PATH} && \
+         sed -i 's|image: .*/${CI_PROJECT_NAME}:.*|image: ${CI_REGISTRY_IMAGE}:${IMAGE_TAG}|g' docker-compose.yml && \
+         docker-compose pull ${CI_PROJECT_NAME} && \
+         docker-compose up -d ${CI_PROJECT_NAME}"
+      
+      echo "=== Deployment Complete ==="
+      echo "Service deployed with version ${IMAGE_TAG}"
+  environment:
+    name: ${CI_COMMIT_REF_NAME}
+    url: http://${TARGET_IP}:8080
+  when: manual
+  tags:
+    - docker
+
+# ============================================================
+# Stage: .post - Cleanup and Reporting
+# ============================================================
+
+# Generate build report
+build-report:
+  stage: .post
+  image: alpine:latest
+  needs:
+    - calculate-version
+    - maven-build-and-test
+  script:
+    - |
+      echo "=== Build Report ===" > build-report.txt
+      echo "" >> build-report.txt
+      echo "Project: ${CI_PROJECT_NAME}" >> build-report.txt
+      echo "Branch: ${CI_COMMIT_REF_NAME}" >> build-report.txt
+      echo "Commit: ${CI_COMMIT_SHORT_SHA}" >> build-report.txt
+      echo "Version: ${FULL_VERSION}" >> build-report.txt
+      echo "Built by: ${GITLAB_USER_LOGIN}" >> build-report.txt
+      echo "Build time: $(date)" >> build-report.txt
+      echo "" >> build-report.txt
+      echo "Artifacts:" >> build-report.txt
+      echo "  Maven: https://nexus.electra.lan/repository/redacted/${CI_PROJECT_NAME}/${FULL_VERSION}/" >> build-report.txt
+      echo "  Docker: ${CI_REGISTRY_IMAGE}:${IMAGE_TAG}" >> build-report.txt
+      
+      cat build-report.txt
+  artifacts:
+    paths:
+      - build-report.txt
+    expire_in: 30 days
+  when: always
+  tags:
+    - docker
+
+# Cleanup old SNAPSHOT artifacts from local cache
+cleanup-local-snapshots:
+  stage: .post
+  image: alpine:latest
+  script:
+    - |
+      echo "=== Cleaning up old SNAPSHOT artifacts ==="
+      # Clean up build cache to prevent bloat
+      find .m2/repository -name "*-SNAPSHOT" -type d -mtime +7 -exec rm -rf {} + || true
+      echo "Cleanup complete"
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-build
+    paths:
+      - .m2/repository
+    policy: pull-push
+  when: always
+  allow_failure: true
+  tags:
+    - docker
