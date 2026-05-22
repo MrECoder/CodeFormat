@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>redacted.group.id</groupId>
+    <artifactId>redacted-bom</artifactId>
+    <version>${revision}${changelist}</version>
+    <packaging>pom</packaging>
+
+    <name>redacted-bom</name>
+    <description>Centralized dependency versions for all microservices.</description>
+
+    <!-- ============================================================ -->
+    <!-- CI-Friendly Version Properties                               -->
+    <!-- Never edit these in source control - injected by CI/CD       -->
+    <!-- ============================================================ -->
+    <properties>
+        <!-- Base version - only increment for major releases -->
+        <revision>0.0.1</revision>
+        
+        <!-- Changelist - injected by pipeline, defaults to SNAPSHOT -->
+        <!-- Local dev: -SNAPSHOT -->
+        <!-- Feature branch: -SNAPSHOT-username-branchname -->
+        <!-- Main branch: -SNAPSHOT -->
+        <!-- Release: (empty string) -->
+        <changelist>-SNAPSHOT</changelist>
+        
+        <!-- Internal component versions - all use same CI-friendly pattern -->
+        <code-style.version>${revision}${changelist}</code-style.version>
+        <common-java-components.version>${revision}${changelist}</common-java-components.version>
+        <common-rabbitmq-components.version>${revision}${changelist}</common-rabbitmq-components.version>
+        <common-notification-service.version>${revision}${changelist}</common-notification-service.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+
+            <!-- ======================================================== -->
+            <!-- Compile Time Dependencies                                -->
+            <!-- ======================================================== -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>1.18.42</version> 
+            </dependency>
+
+            <!-- ======================================================== -->
+            <!-- Import Spring Boot's BOM                                 -->
+            <!-- ======================================================== -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>3.5.6</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- ======================================================== -->
+            <!-- Optional: SpringDoc version                              -->
+            <!-- ======================================================== -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>2.5.0</version>
+            </dependency>
+
+            <!-- ======================================================== -->
+            <!-- Internal common components                               -->
+            <!-- All versions managed via properties above                -->
+            <!-- ======================================================== -->
+            <dependency>
+                <groupId>redacted.group.id</groupId>
+                <artifactId>code-style</artifactId>
+                <version>${code-style.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>redacted.group.id</groupId>
+                <artifactId>common-java-components</artifactId>
+                <version>${common-java-components.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>redacted.group.id</groupId>
+                <artifactId>common-rabbitmq-components</artifactId>
+                <version>${common-rabbitmq-components.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>redacted.group.id</groupId>
+                <artifactId>common-notification-service</artifactId>
+                <version>${common-notification-service.version}</version>
+            </dependency>
+
+            <!-- ======================================================== -->
+            <!-- Test dependencies                                        -->
+            <!-- ======================================================== -->
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>4.13.2</version>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <!-- ============================================ -->
+            <!-- Flatten Plugin - CRITICAL for CI-friendly    -->
+            <!-- Resolves ${revision}${changelist} in deployed POM -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>bom</flattenMode>
+                    <pomElements>
+                        <dependencyManagement>expand</dependencyManagement>
+                        <properties>remove</properties>
+                        <repositories>remove</repositories>
+                    </pomElements>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- ======================================================== -->
+    <!-- Central distribution management                          -->
+    <!-- ======================================================== -->
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/redacted/parent-pom</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshot</id>
+            <url>https://nexus.electra.lan/repository/redacted</url>
+        </snapshotRepository>
+    </distributionManagement>
+</project>
