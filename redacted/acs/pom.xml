@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>redacted.group.id</groupId>
+        <artifactId>redacted-parent</artifactId>
+        <version>${revision}${changelist}</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>redacted.group.id</groupId>
+    <artifactId>application-catalogue-service</artifactId>
+    <!-- Version inherited from parent -->
+    <packaging>jar</packaging>
+    <name>application-catalogue-service</name>
+    <description>Application Registration service and broadcast notifier</description>
+
+    <!-- ======================================================== -->
+    <!-- REQUIRED: CI-Friendly Version Properties                 -->
+    <!-- ======================================================== -->
+    <properties>
+        <revision>0.0.1</revision>
+        <changelist>-SNAPSHOT</changelist>
+        
+        <!-- Other properties -->
+        <java.version>25</java.version>
+        <springdoc.version>2.5.0</springdoc.version>
+        
+        <!-- Main class for Spring Boot -->
+        <start-class>redacted.group.id.catalogue.CatalogueServiceApplication</start-class>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <!-- Version managed by BOM -->
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Internal Dependencies - NO VERSION SPECIFIED             -->
+        <!-- All managed by BOM via dependencyManagement              -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>redacted.group.id</groupId>
+            <artifactId>common-java-components</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>redacted.group.id</groupId>
+            <artifactId>common-rabbitmq-components</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>redacted.group.id</groupId>
+            <artifactId>common-notification-service</artifactId>
+        </dependency>
+
+        <!-- ======================================================== -->
+        <!-- Test Scoped dependencies                                 -->
+        <!-- ======================================================== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- ============================================ -->
+            <!-- Spring Boot plugin                           -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <mainClass>${start-class}</mainClass>
+                </configuration>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- JAR Plugin - inherited from parent           -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Spotless                                     -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Flatten Plugin                               -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Deploy Plugin - ensure JAR is deployed       -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <configuration>
+                    <!-- Deploy both repackaged and original JARs -->
+                    <skip>false</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/redacted/application-catalogue-service</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshot</id>
+            <url>https://nexus.electra.lan/repository/redacted</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+</project>
