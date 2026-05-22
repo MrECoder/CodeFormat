@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>redacted.group.id</groupId>
+    <artifactId>redacted-parent</artifactId>
+    <version>${revision}${changelist}</version>
+    <packaging>pom</packaging>
+
+    <name>redacted-parent</name>
+    <description>Shared build configuration for all microservices.</description>
+
+    <!-- ======================================================== -->
+    <!-- CI-Friendly Version Properties                           -->
+    <!-- ======================================================== -->
+    <properties>
+        <!-- Version components - injected by CI/CD pipeline -->
+        <revision>0.0.1</revision>
+        <changelist>-SNAPSHOT</changelist>
+        
+        <!-- Build properties -->
+        <java.version>25</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>25</maven.compiler.release>
+        
+        <!-- Timestamp for manifest entries -->
+        <maven.build.timestamp.format>yyyy-MM-dd HH:mm:ss</maven.build.timestamp.format>
+    </properties>
+
+    <!-- ======================================================== -->
+    <!-- Dependency management imports the company BOM            -->
+    <!-- ======================================================== -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>redacted.group.id</groupId>
+                <artifactId>redacted-bom</artifactId>
+                <version>${revision}${changelist}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+
+    <!-- ======================================================== -->
+    <!-- Build phase                                              -->
+    <!-- ======================================================== -->
+    <build>
+        <pluginManagement>
+            <plugins>
+
+                <!-- ============================================ -->
+                <!-- Dependency plugin                            -->
+                <!-- ============================================ -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>3.6.1</version>
+                    <executions>
+                        <execution>
+                            <id>unpack-code-style</id>
+                            <phase>generate-resources</phase>
+                            <goals>
+                                <goal>unpack</goal>
+                            </goals>
+                            <configuration>
+                                <artifactItems>
+                                    <artifactItem>
+                                        <groupId>redacted.group.id</groupId>
+                                        <artifactId>code-style</artifactId>
+                                        <!-- Version managed by BOM -->
+                                        <outputDirectory>${project.build.directory}/code-style</outputDirectory>
+                                    </artifactItem>
+                                </artifactItems>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- ============================================ -->
+                <!-- Spotless plugin                              -->
+                <!-- ============================================ -->
+                <plugin>
+                    <groupId>com.diffplug.spotless</groupId>
+                    <artifactId>spotless-maven-plugin</artifactId>
+                    <version>2.43.0</version>
+
+                    <dependencies>
+                        <dependency>
+                            <groupId>redacted.group.id</groupId>
+                            <artifactId>code-style</artifactId>
+                            <!-- Version comes from BOM via property -->
+                            <version>${code-style.version}</version>
+                        </dependency>
+                    </dependencies>
+
+                    <configuration>
+                        <java>
+                            <eclipse>
+                                <file>classpath:/eclipse-java-formatter.xml</file>
+                            </eclipse>
+                        </java>
+                    </configuration>
+                </plugin>
+
+                <!-- ============================================ -->
+                <!-- Flatten Plugin (managed version)             -->
+                <!-- ============================================ -->
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>flatten-maven-plugin</artifactId>
+                    <version>1.6.0</version>
+                    <configuration>
+                        <updatePomFile>true</updatePomFile>
+                        <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>flatten</id>
+                            <phase>process-resources</phase>
+                            <goals>
+                                <goal>flatten</goal>
+                            </goals>
+                        </execution>
+                        <execution>
+                            <id>flatten.clean</id>
+                            <phase>clean</phase>
+                            <goals>
+                                <goal>clean</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
+        <plugins>
+            
+            <!-- ============================================ -->
+            <!-- Flatten Plugin - ALWAYS FIRST               -->
+            <!-- Resolves ${revision}${changelist}            -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+            </plugin>
+            
+            <!-- ============================================ -->
+            <!-- Compiler plugin                              -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>${maven.compiler.release}</release>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.42</version>
+                        </path>
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                            <version>3.5.6</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+            
+            <!-- ============================================ -->
+            <!-- JAR Plugin - Enhanced Manifest               -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>${start-class}</mainClass>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                            <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+                        </manifest>
+                        <manifestEntries>
+                            <Implementation-Version>${project.version}</Implementation-Version>
+                            <Build-Time>${maven.build.timestamp}</Build-Time>
+                            <Build-User>${user.name}</Build-User>
+                            <Build-Java>${java.version}</Build-Java>
+                            <Build-OS>${os.name} ${os.version}</Build-OS>
+                            <Git-Commit>${git.commit.id.abbrev}</Git-Commit>
+                            <Git-Branch>${git.branch}</Git-Branch>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+
+
+            <!-- ============================================ -->
+            <!-- Spring Boot plugin                           -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>3.5.6</version>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Testing plugins                              -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Enforcer plugin                              -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>enforce</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>${java.version}</version>
+                                </requireJavaVersion>
+                                <dependencyConvergence/>
+                            </rules>
+                        </configuration>
+                    </execution>
+    
+                    <execution>
+                        <id>no-snapshots</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireReleaseDeps>
+                                    <message>No SNAPSHOTs allowed in release builds!</message>
+                                    <onlyWhenRelease>true</onlyWhenRelease>
+                                </requireReleaseDeps>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Versions plugin                              -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.21.0</version>
+
+                <configuration>
+                    <generateBackupPoms>true</generateBackupPoms>
+                    <processDependencies>true</processDependencies>
+                    <processDependencyManagement>true</processDependencyManagement>
+                    <processPluginDependencies>true</processPluginDependencies>
+                    <allowSnapshots>false</allowSnapshots>
+
+                    <includes>
+                        <include>*:*</include>
+                    </includes>
+
+                    <ruleSet>
+                        <rules>
+                            <requireReleaseDeps>
+                                <!--
+                                <message>No SNAPSHOT dependencies allowed unless explicitly permitted</message>
+                                <failWhenSnapshotsFound>true</failWhenSnapshotsFound>
+                                -->
+                            </requireReleaseDeps>
+                        </rules>
+                    </ruleSet>
+                </configuration>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Release plugin                               -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>3.0.1</version>
+                <configuration>
+                    <tagNameFormat>v@{project.version}</tagNameFormat>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                    <releaseProfiles>release</releaseProfiles>
+                    <goals>deploy</goals>
+                    
+                    <checkModificationExcludes>
+                        <checkModificationExclude>pom.xml</checkModificationExclude>
+                    </checkModificationExcludes>
+                </configuration>
+            </plugin>
+
+            <!-- ============================================ -->
+            <!-- Git Commit ID Plugin (optional but useful)   -->
+            <!-- Adds git info to JAR manifest                -->
+            <!-- ============================================ -->
+            <plugin>
+                <groupId>io.github.git-commit-id</groupId>
+                <artifactId>git-commit-id-maven-plugin</artifactId>
+                <version>7.0.0</version>
+                <executions>
+                    <execution>
+                        <id>get-the-git-infos</id>
+                        <goals>
+                            <goal>revision</goal>
+                        </goals>
+                        <phase>initialize</phase>
+                    </execution>
+                </executions>
+                <configuration>
+                    <generateGitPropertiesFile>true</generateGitPropertiesFile>
+                    <generateGitPropertiesFilename>${project.build.outputDirectory}/git.properties</generateGitPropertiesFilename>
+                    <includeOnlyProperties>
+                        <includeOnlyProperty>^git.branch$</includeOnlyProperty>
+                        <includeOnlyProperty>^git.commit.id.abbrev$</includeOnlyProperty>
+                        <includeOnlyProperty>^git.commit.time$</includeOnlyProperty>
+                    </includeOnlyProperties>
+                    <commitIdGenerationMode>full</commitIdGenerationMode>
+                </configuration>
+            </plugin>
+
+        </plugins>
+    </build>
+    
+
+    <!-- ======================================================== -->
+    <!-- Central distribution management                          -->
+    <!-- ======================================================== -->
+    <distributionManagement>
+        <repository>
+            <id>nexus-site</id>
+            <url>https://nexus.electra.lan/repository/redacted/parent-pom</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshot</id>
+            <url>https://nexus.electra.lan/repository/redacted</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+</project>
