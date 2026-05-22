@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  application-catalogue-service:
+    image: ${CI_REGISTRY_IMAGE:-registry.electra.lan/application-catalogue-service}:${IMAGE_TAG:-latest}
+    container_name: catalogue-service
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        REVISION: ${REVISION:-0.0.1}
+        CHANGELIST: ${CHANGELIST:--SNAPSHOT}
+        APP_VERSION: ${FULL_VERSION:-0.0.1-SNAPSHOT}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+        VCS_REF: ${CI_COMMIT_SHORT_SHA:-unknown}
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-production}
+      JAVA_OPTS: >-
+        -XX:+UseContainerSupport
+        -XX:MaxRAMPercentage=75.0
+        -XX:+UseG1GC
+        -Dspring.rabbitmq.host=rabbitmq
+        -Dspring.rabbitmq.port=5672
+    networks:
+      - app-network
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped
+    labels:
+      com.redacted.version: "${FULL_VERSION:-unknown}"
+      com.redacted.service: "catalogue"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  application-instance-access-service:
+    image: ${CI_REGISTRY_IMAGE:-registry.electra.lan/application-instance-access-service}:${IMAGE_TAG:-latest}
+    container_name: instance-access-service
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        REVISION: ${REVISION:-0.0.1}
+        CHANGELIST: ${CHANGELIST:--SNAPSHOT}
+        APP_VERSION: ${FULL_VERSION:-0.0.1-SNAPSHOT}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+        VCS_REF: ${CI_COMMIT_SHORT_SHA:-unknown}
+    ports:
+      - "8090:8080"
+      - "8091:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-production}
+      JAVA_OPTS: >-
+        -XX:+UseContainerSupport
+        -XX:MaxRAMPercentage=75.0
+    networks:
+      - app-network
+    depends_on:
+      - rabbitmq
+      - application-catalogue-service
+    restart: unless-stopped
+    labels:
+      com.redacted.version: "${FULL_VERSION:-unknown}"
+      com.redacted.service: "instance-access"
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-admin}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  rabbitmq-data:
