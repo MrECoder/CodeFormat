@@ -6,6 +6,7 @@
 
 POM STRUCTURE
 ─────────────────────────────────────────────────────────────
+
 <version>${revision}${changelist}</version>
 
 <properties>
@@ -15,6 +16,7 @@ POM STRUCTURE
 
 COMMON COMMANDS
 ─────────────────────────────────────────────────────────────
+
 Local Build (Default):
   $ mvn clean install
   → Produces: 0.0.1-SNAPSHOT
@@ -32,6 +34,7 @@ Deploy to Nexus:
 
 VERSION PATTERNS
 ─────────────────────────────────────────────────────────────
+
 Main Branch:          0.0.1-SNAPSHOT
 Feature Branch:       0.0.1-SNAPSHOT-jsmith-feature-auth
 Merge Request:        0.0.1-SNAPSHOT-MR123
@@ -39,6 +42,7 @@ Release Tag:          0.0.2
 
 TROUBLESHOOTING
 ─────────────────────────────────────────────────────────────
+
 Issue: Parent POM not found
 Fix:   cd parent-pom && mvn install
 
@@ -50,6 +54,7 @@ Fix:   Check GitLab CI logs for calculate-version
 
 RESOURCES
 ─────────────────────────────────────────────────────────────
+
 Docs:    [wiki link]
 Slack:   #engineering-maven-migration
 Support: [email]
